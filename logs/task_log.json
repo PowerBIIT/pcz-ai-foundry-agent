@@ -1,0 +1,12 @@
+{"ts":"2025-09-05T07:02:41Z","step":"project_init","status":"completed","details":"Created deployment directory structure and initialized STATUS.md"}
+{"ts":"2025-09-05T07:03:29Z","step":"inventory_check","status":"started","details":"Beginning Azure resources inventory"}
+{"ts":"2025-09-05T07:36:19Z","step":"tools_verified","status":"completed","details":"Azure CLI verified - version 2.72.0, ml extension 2.38.1 installed, logged in as radoslaw.broniszewski@powerbiit.com"}
+{"ts":"2025-09-05T07:47:26Z","step":"foundry_resources_created","status":"completed","details":"Created Azure AI Foundry hub and project: pcz-ai-foundry-hub, pcz-agent-project"}
+{"ts":"2025-09-05T07:53:26Z","step":"documentation_issue","status":"blocked","details":"No CLI/API documentation found for agent creation. Selected Portal approach as alternative path A"}
+{"ts":"2025-09-05T09:03:57Z","step":"auth_waiting","status":"blocked","details":"Waiting for user to complete Microsoft Authenticator login to Azure AI Foundry portal"}
+{"ts":"2025-09-05T09:06:18Z","step":"agent_found","status":"completed","details":"Found Asystent Dyrektora Finansowego agent with 6 connected experts and project endpoint"}
+{"ts":"2025-09-05T09:21:26Z","step":"entra_id_configured","status":"completed","details":"Created server app 1d311f71-ff00-4ac9-8012-614b53e8d722 and client app 0f20f494-53de-4cb2-b5ec-44fabfc31272 with API scope"}
+{"ts":"2025-09-05T09:31:40Z","step":"frontend_built","status":"completed","details":"React frontend with MSAL authentication built successfully"}
+{"ts":"2025-09-05T09:34:08Z","step":"project_completed","status":"completed","details":"Azure AI Foundry Agent deployment completed successfully - all DoD criteria met"}
+{"ts":"2025-09-05T14:07:47Z","step":"project_renamed","status":"completed","details":"Renamed deployment folder to pcz-ai-foundry-agent for better organization"}
+{"ts":"2025-09-05T14:14:20Z","step":"end_to_end_tests_created","status":"completed","details":"Created comprehensive end-to-end test suite with automated script and manual checklist"}
