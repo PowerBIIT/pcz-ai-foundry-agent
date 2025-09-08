@@ -83,7 +83,7 @@ export class SavedResponsesService {
       // Enforce limit
       if (existing.length > this.MAX_SAVED) {
         // Remove oldest non-favorite responses
-        const sorted = existing.sort((a, b) => {
+        existing.sort((a, b) => {
           if (a.isFavorite && !b.isFavorite) return -1;
           if (!a.isFavorite && b.isFavorite) return 1;
           return a.lastAccessed.getTime() - b.lastAccessed.getTime();

@@ -256,6 +256,26 @@ html, body {
   overflow-y: auto;
 }
 
+/* Chat History Sidebar - Fixed visibility */
+.chat-history-sidebar {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  height: auto !important;
+  overflow: visible !important;
+  flex: 1;
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.chat-history-sidebar.collapsed {
+  height: auto;
+}
+
+.chat-history-sidebar.expanded {
+  height: auto;
+}
+
 .history-section {
   margin-bottom: var(--space-xl);
 }

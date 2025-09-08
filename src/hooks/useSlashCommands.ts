@@ -1,7 +1,7 @@
 // Slash Commands Hook - Power User Features  
 // Sprint 3 - Professional Tools
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 
 export interface SlashCommand {
@@ -25,11 +25,10 @@ export interface UseSlashCommandsOptions {
 
 export const useSlashCommands = (options: UseSlashCommandsOptions) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [currentInput, setCurrentInput] = useState('');
   const [filteredCommands, setFilteredCommands] = useState<SlashCommand[]>([]);
 
-  // Define slash commands
-  const commands: SlashCommand[] = [
+  // Define slash commands using useMemo to prevent re-creation on every render
+  const commands: SlashCommand[] = React.useMemo(() => [
     {
       command: '/clear',
       description: 'Rozpocznij nową rozmowę',
@@ -70,7 +69,7 @@ export const useSlashCommands = (options: UseSlashCommandsOptions) => {
       aliases: ['/h', '/?'],
       usage: '/help'
     }
-  ];
+  ], [options]);
 
   // Process input and detect slash commands
   const processInput = useCallback((input: string): { isCommand: boolean; processedInput: string } => {
@@ -115,7 +114,6 @@ export const useSlashCommands = (options: UseSlashCommandsOptions) => {
 
   // Handle input change for auto-complete
   const handleInputChange = useCallback((input: string) => {
-    setCurrentInput(input);
 
     if (!input.startsWith('/') || input.length < 2) {
       setShowSuggestions(false);

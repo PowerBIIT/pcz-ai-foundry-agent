@@ -1,7 +1,7 @@
 // User Session Management Service
 // Sprint 1 - Multi-User Support
 
-import { UserSession, ThreadMappingStorage, UnauthorizedThreadAccessError, SessionExpiredError, SessionCreationError } from '../types/UserSession';
+import { UserSession, ThreadMappingStorage, UnauthorizedThreadAccessError, SessionCreationError } from '../types/UserSession';
 import { SessionStorageManager } from '../utils/sessionStorage';
 import { agentConfig } from '../authConfig';
 
@@ -25,9 +25,9 @@ export class UserSessionService {
         ? SessionStorageManager.cleanupExpiredSessions(storage)
         : storage;
 
-      // Load sessions into memory
+      // Load sessions into memory - use threadId as key to preserve all threads
       cleanedStorage.sessions.forEach(session => {
-        this.sessions.set(session.userId, session);
+        this.sessions.set(session.threadId, session);
       });
 
       // Save cleaned storage back
@@ -56,7 +56,10 @@ export class UserSessionService {
   async getUserThread(userId: string): Promise<string> {
     await this.ensureInitialized();
 
-    let session = this.sessions.get(userId);
+    // Find current session for user (newest threadId)
+    let session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
 
     if (!session || !session.isActive) {
       console.info(`Creating new session for user: ${userId}`);
@@ -93,8 +96,8 @@ export class UserSessionService {
         }
       };
 
-      // Store in memory and localStorage
-      this.sessions.set(userId, session);
+      // Store in memory and localStorage - use threadId as key to allow multiple sessions per user
+      this.sessions.set(session.threadId, session);
       this.persistSessions();
 
       console.info(`Created new session: ${userId} → ${threadId}`);
@@ -157,7 +160,10 @@ export class UserSessionService {
       throw new UnauthorizedThreadAccessError(userId, threadId);
     }
 
-    const session = this.sessions.get(userId);
+    // Find current session for user
+    const session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
     if (session) {
       session.threadId = threadId;
       session.lastActive = new Date();
@@ -171,7 +177,10 @@ export class UserSessionService {
   async authorizeThreadAccess(userId: string, threadId: string): Promise<boolean> {
     await this.ensureInitialized();
 
-    const session = this.sessions.get(userId);
+    // Find current session for user
+    const session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
     if (!session) {
       return false;
     }
@@ -219,14 +228,18 @@ export class UserSessionService {
    */
   async getUserSession(userId: string): Promise<UserSession | null> {
     await this.ensureInitialized();
-    return this.sessions.get(userId) || null;
+    // Find current session for user (newest threadId)
+    const session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
+    return session || null;
   }
 
   /**
    * Update user session
    */
   updateSession(session: UserSession): void {
-    this.sessions.set(session.userId, session);
+    this.sessions.set(session.threadId, session);
     this.persistSessions();
   }
 
@@ -234,7 +247,10 @@ export class UserSessionService {
    * Increment message count for user session
    */
   incrementMessageCount(userId: string): void {
-    const session = this.sessions.get(userId);
+    // Find current session for user
+    const session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
     if (session && session.metadata) {
       session.metadata.messageCount++;
       session.lastActive = new Date();
@@ -248,7 +264,10 @@ export class UserSessionService {
   async deactivateSession(userId: string): Promise<void> {
     await this.ensureInitialized();
 
-    const session = this.sessions.get(userId);
+    // Find current session for user
+    const session = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId)
+      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
     if (session) {
       session.isActive = false;
       session.lastActive = new Date();
@@ -270,7 +289,7 @@ export class UserSessionService {
       // Reload sessions from cleaned storage
       this.sessions.clear();
       cleanedStorage.sessions.forEach(session => {
-        this.sessions.set(session.userId, session);
+        this.sessions.set(session.threadId, session);
       });
 
       SessionStorageManager.saveToStorage(cleanedStorage);

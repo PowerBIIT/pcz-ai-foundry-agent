@@ -3,8 +3,8 @@
 
 import { userSessionService } from './UserSessionService';
 import { UnauthorizedThreadAccessError } from '../types/UserSession';
-import { ChatMessage } from './ChatService';
 import { agentConfig } from '../authConfig';
+import { chatService, ChatMessage } from './ChatService';
 
 export interface ConversationMetadata {
   threadId: string;
@@ -39,7 +39,7 @@ export class ChatHistoryService {
   /**
    * Get conversation history for user
    */
-  async getConversationHistory(userId: string, limit = 50): Promise<ConversationMetadata[]> {
+  async getConversationHistory(userId: string, token: string, limit = 50): Promise<ConversationMetadata[]> {
     try {
       // Get all user threads
       const userThreads = await userSessionService.getUserThreads(userId);
@@ -55,7 +55,7 @@ export class ChatHistoryService {
           }
 
           // Get conversation metadata
-          const metadata = await this.getConversationMetadata(threadId, userId);
+          const metadata = await this.getConversationMetadata(threadId, userId, token);
           if (metadata && metadata.messageCount > 0) {
             conversations.push(metadata);
           }
@@ -66,11 +66,17 @@ export class ChatHistoryService {
         }
       }
 
+      // Deduplicate by threadId (usuwamy duplikaty)
+      const unique = conversations.filter((conv, index, arr) => 
+        arr.findIndex(c => c.threadId === conv.threadId) === index
+      );
+
       // Sort by last activity (newest first)
-      const sorted = conversations
+      const sorted = unique
         .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())
         .slice(0, limit);
 
+      console.info(`Deduplicated: ${conversations.length} → ${unique.length} → ${sorted.length} conversations`);
       return sorted;
 
     } catch (error) {
@@ -82,7 +88,7 @@ export class ChatHistoryService {
   /**
    * Get conversation metadata from thread
    */
-  async getConversationMetadata(threadId: string, userId: string): Promise<ConversationMetadata | null> {
+  async getConversationMetadata(threadId: string, userId: string, token: string): Promise<ConversationMetadata | null> {
     try {
       // Check local cache first
       const cached = this.getCachedMetadata(threadId);
@@ -90,25 +96,31 @@ export class ChatHistoryService {
         return cached;
       }
 
-      // For now, generate metadata from session service
-      // In real implementation, would call Azure AI Foundry
-      const session = await userSessionService.getUserSession(userId);
-      if (!session || session.threadId !== threadId) {
+      // Get real messages from Azure AI Foundry
+      const realMessages = await this.getThreadRealMessages(threadId, token);
+      if (!realMessages || realMessages.length === 0) {
+        console.warn(`No messages found for thread ${threadId}, skipping`);
         return null;
       }
+
+      const lastMessage = realMessages[0]; // Azure zwraca od najnowszych
+      const firstUserMessage = realMessages.find(m => m.role === 'user');
+      const lastAssistantMessage = realMessages.find(m => m.role === 'assistant');
+      
+      console.info(`Generated title from content: "${firstUserMessage?.content?.substring(0, 50)}"`);      
 
       const metadata: ConversationMetadata = {
         threadId,
         userId,
-        title: this.generateConversationTitle(threadId, session.metadata?.messageCount || 0),
-        lastMessage: 'Konwersacja z agentem finansowym',
-        lastMessagePreview: 'Rozmowa dotycząca finansów uczelni...',
-        lastActivity: session.lastActive,
-        messageCount: session.metadata?.messageCount || 0,
+        title: await this.generateTitleFromContent(firstUserMessage?.content || ''),
+        lastMessage: lastMessage.content.substring(0, 100) + (lastMessage.content.length > 100 ? '...' : ''),
+        lastMessagePreview: lastMessage.content.substring(0, 100),
+        lastActivity: lastMessage.timestamp,
+        messageCount: realMessages.length,
         hasAttachments: await this.checkForAttachments(threadId, userId),
-        agentType: 'Multi-Agent Router',
-        tags: this.generateTags(threadId),
-        isActive: session.isActive && session.threadId === threadId
+        agentType: this.detectAgentFromContent(lastAssistantMessage?.content || ''),
+        tags: this.generateTagsFromContent(realMessages),
+        isActive: await this.isThreadActive(userId, threadId)
       };
 
       // Cache metadata
@@ -125,9 +137,9 @@ export class ChatHistoryService {
   /**
    * Search conversations by query
    */
-  async searchConversations(userId: string, query: string): Promise<ConversationMetadata[]> {
+  async searchConversations(userId: string, query: string, token: string): Promise<ConversationMetadata[]> {
     try {
-      const allConversations = await this.getConversationHistory(userId);
+      const allConversations = await this.getConversationHistory(userId, token);
       
       if (!query.trim()) {
         return allConversations;
@@ -151,9 +163,9 @@ export class ChatHistoryService {
   /**
    * Get conversation summary stats
    */
-  async getConversationSummary(userId: string): Promise<ConversationSummary> {
+  async getConversationSummary(userId: string, token: string): Promise<ConversationSummary> {
     try {
-      const conversations = await this.getConversationHistory(userId, 100);
+      const conversations = await this.getConversationHistory(userId, token, 100);
       
       const agentCounts = new Map<string, number>();
       let totalMessages = 0;
@@ -224,9 +236,9 @@ export class ChatHistoryService {
   /**
    * Update conversation title
    */
-  async updateConversationTitle(threadId: string, userId: string, newTitle: string): Promise<void> {
+  async updateConversationTitle(threadId: string, userId: string, newTitle: string, token: string): Promise<void> {
     try {
-      const metadata = await this.getConversationMetadata(threadId, userId);
+      const metadata = await this.getConversationMetadata(threadId, userId, token);
       if (metadata) {
         metadata.title = newTitle;
         this.cacheMetadata(metadata);
@@ -359,6 +371,133 @@ export class ChatHistoryService {
     const ageMinutes = (now.getTime() - cached.getTime()) / (1000 * 60);
     
     return ageMinutes < 5; // Fresh for 5 minutes
+  }
+
+  /**
+   * Get real messages from Azure AI Foundry thread
+   */
+  async getThreadRealMessages(threadId: string, token: string): Promise<ChatMessage[]> {
+    try {
+      console.info(`Loading real messages for thread ${threadId}`);
+      const messages = await chatService.getThreadAllMessages(threadId, token);
+      console.info(`Found ${messages.length} real messages in thread ${threadId}`);
+      return messages;
+    } catch (error) {
+      console.warn(`Failed to get real messages from thread ${threadId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Load all messages from a conversation for display in chat interface
+   */
+  async loadConversationMessages(threadId: string, userId: string, token: string): Promise<ChatMessage[]> {
+    try {
+      // Verify user has access to this thread
+      const authorized = await userSessionService.authorizeThreadAccess(userId, threadId);
+      if (!authorized) {
+        throw new Error(`Unauthorized access to thread ${threadId} for user ${userId}`);
+      }
+
+      console.info(`Loading conversation messages for thread ${threadId}`);
+      
+      // Get all messages from the thread
+      const messages = await this.getThreadRealMessages(threadId, token);
+      
+      // Sort messages chronologically (oldest first) for chat display
+      const sortedMessages = messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
+      // Add userId to all messages
+      const messagesWithUserId = sortedMessages.map(msg => ({
+        ...msg,
+        userId,
+        threadId
+      }));
+
+      console.info(`Loaded ${messagesWithUserId.length} messages for conversation ${threadId}`);
+      return messagesWithUserId;
+
+    } catch (error) {
+      console.error(`Failed to load conversation messages for ${threadId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate title from first user message content
+   */
+  private async generateTitleFromContent(content: string): Promise<string> {
+    if (!content || content.length === 0) {
+      return 'Pusta rozmowa';
+    }
+
+    // Usuń formatowanie i skróć
+    const cleaned = content.replace(/[*#_`]/g, '').trim();
+    
+    if (cleaned.length <= 50) {
+      return cleaned;
+    }
+
+    // Znajdź punkt końcowy w pobliżu 50 znaków
+    const truncated = cleaned.substring(0, 50);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    if (lastSpace > 30) {
+      return truncated.substring(0, lastSpace) + '...';
+    }
+    
+    return truncated + '...';
+  }
+
+  /**
+   * Detect which expert agent responded based on content
+   */
+  private detectAgentFromContent(content: string): string {
+    if (content.includes('🔍') && content.includes('Audytor')) return 'Audytor';
+    if (content.includes('💰') && content.includes('Budżet')) return 'Ekspert Budżetu';
+    if (content.includes('📋') && content.includes('Zamówień')) return 'Ekspert Zamówień';
+    if (content.includes('Ekspert_Majatku')) return 'Ekspert Majątku';
+    if (content.includes('Ekspert_Plynnosci')) return 'Ekspert Płynności';
+    if (content.includes('Ekspert_Rachunkowosci')) return 'Ekspert Rachunkowości';
+    if (content.includes('Ekspert_Zarzadzen')) return 'Ekspert Zarządzeń';
+    if (content.includes('Prawnik_Compliance')) return 'Prawnik';
+    if (content.includes('Strateg')) return 'Strateg';
+    if (content.includes('Mentor')) return 'Mentor';
+    
+    return 'Multi-Agent Router';
+  }
+
+  /**
+   * Generate tags from conversation content
+   */
+  private generateTagsFromContent(messages: ChatMessage[]): string[] {
+    const tags = ['finansowy', 'pcz', 'agent'];
+    
+    // Analizuj zawartość wiadomości dla dodatkowych tagów
+    const allContent = messages.map(m => m.content.toLowerCase()).join(' ');
+    
+    if (allContent.includes('budżet') || allContent.includes('planowanie')) tags.push('budżet');
+    if (allContent.includes('zamówień') || allContent.includes('przetarg')) tags.push('pzp');
+    if (allContent.includes('audit') || allContent.includes('kontrola')) tags.push('audyt');
+    if (allContent.includes('rachunek') || allContent.includes('księg')) tags.push('rachunkowość');
+    if (allContent.includes('procedur') || allContent.includes('zarządzeń')) tags.push('procedury');
+    if (allContent.includes('majątek') || allContent.includes('amortyzacja')) tags.push('majątek');
+    if (allContent.includes('płynność') || allContent.includes('cash')) tags.push('płynność');
+    
+    return Array.from(new Set(tags)); // Usuń duplikaty
+  }
+
+  /**
+   * Check if thread is currently active for user
+   */
+  private async isThreadActive(userId: string, threadId: string): Promise<boolean> {
+    try {
+      const currentThreadId = await userSessionService.getUserThread(userId);
+      return currentThreadId === threadId;
+    } catch (error) {
+      console.warn(`Error checking if thread ${threadId} is active for user ${userId}:`, error);
+      return false;
+    }
   }
 
   /**

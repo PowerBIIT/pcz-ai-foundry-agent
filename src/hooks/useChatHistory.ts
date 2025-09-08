@@ -5,6 +5,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { chatHistoryService, ConversationMetadata, ConversationSummary } from '../services/ChatHistoryService';
 import { userSessionService } from '../services/UserSessionService';
+import { ChatMessage } from '../services/ChatService';
+
+// Utility functions for chat history events
+export const triggerHistoryRefresh = () => {
+  window.dispatchEvent(new CustomEvent('chatHistoryUpdate'));
+};
+
+export const triggerNewConversation = () => {
+  window.dispatchEvent(new CustomEvent('newConversationCreated'));
+};
+
+export const triggerMessageReceived = () => {
+  window.dispatchEvent(new CustomEvent('messageReceived'));
+};
 
 export interface ChatHistoryState {
   conversations: ConversationMetadata[];
@@ -18,6 +32,7 @@ export interface ChatHistoryState {
 export interface UseChatHistoryOptions {
   autoRefresh?: boolean;
   refreshInterval?: number; // minutes
+  token?: string; // Azure access token
   onConversationSelect?: (threadId: string) => void;
   onError?: (error: Error) => void;
 }
@@ -41,23 +56,33 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
       return;
     }
 
+    if (!options?.token) {
+      console.warn('No token available for chat history, skipping load');
+      return;
+    }
+
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
       const [conversations, summary] = await Promise.all([
-        chatHistoryService.getConversationHistory(userId),
-        chatHistoryService.getConversationSummary(userId)
+        chatHistoryService.getConversationHistory(userId, options.token),
+        chatHistoryService.getConversationSummary(userId, options.token)
       ]);
+
+      // Deduplicate conversations at React state level
+      const uniqueConversations = conversations.filter((conv, index, arr) => 
+        arr.findIndex(c => c.threadId === conv.threadId) === index
+      );
 
       setState(prev => ({
         ...prev,
-        conversations,
+        conversations: uniqueConversations,
         summary,
-        filteredConversations: conversations,
+        filteredConversations: uniqueConversations,
         isLoading: false
       }));
 
-      console.info(`Loaded ${conversations.length} conversations for user ${userId}`);
+      console.info(`Loaded ${conversations.length} conversations for user ${userId} using Azure API`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to load history';
@@ -71,7 +96,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
       options?.onError?.(error as Error);
       console.error('Failed to load chat history:', error);
     }
-  }, [userId, options]);
+  }, [userId, options?.token]); // Dodano token do zależności
 
   /**
    * Search conversations
@@ -79,16 +104,36 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
   const searchConversations = useCallback(async (query: string) => {
     setState(prev => ({ ...prev, searchQuery: query }));
 
-    if (!userId) return;
+    if (!userId || !options?.token) return;
 
     try {
-      const filtered = await chatHistoryService.searchConversations(userId, query);
+      const filtered = await chatHistoryService.searchConversations(userId, query, options.token);
       setState(prev => ({ ...prev, filteredConversations: filtered }));
     } catch (error) {
       console.error('Search failed:', error);
       toast.error('Błąd wyszukiwania');
     }
-  }, [userId]);
+  }, [userId, options?.token]);
+
+  /**
+   * Load messages from a specific conversation
+   */
+  const loadConversationMessages = useCallback(async (threadId: string): Promise<ChatMessage[]> => {
+    if (!userId || !options?.token) {
+      console.warn('Cannot load conversation messages: missing userId or token');
+      return [];
+    }
+
+    try {
+      console.info(`Loading messages for conversation ${threadId}`);
+      const messages = await chatHistoryService.loadConversationMessages(threadId, userId, options.token);
+      return messages;
+    } catch (error) {
+      console.error(`Failed to load messages for conversation ${threadId}:`, error);
+      toast.error('Błąd ładowania wiadomości z rozmowy');
+      return [];
+    }
+  }, [userId, options?.token]);
 
   /**
    * Select conversation
@@ -120,7 +165,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
       console.error('Failed to select conversation:', error);
       toast.error('Błąd przełączania rozmowy');
     }
-  }, [userId, options]);
+  }, [userId]); // Usunięto 'options' z zależności aby uniknąć pętli
 
   /**
    * Delete conversation
@@ -150,10 +195,10 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
    * Update conversation title
    */
   const updateConversationTitle = useCallback(async (threadId: string, newTitle: string) => {
-    if (!userId) return;
+    if (!userId || !options?.token) return;
 
     try {
-      await chatHistoryService.updateConversationTitle(threadId, userId, newTitle);
+      await chatHistoryService.updateConversationTitle(threadId, userId, newTitle, options.token);
       
       // Update state
       setState(prev => ({
@@ -172,7 +217,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
       console.error('Failed to update title:', error);
       toast.error('Błąd aktualizacji tytułu');
     }
-  }, [userId]);
+  }, [userId, options?.token]);
 
   /**
    * Clear search
@@ -202,6 +247,25 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     loadHistory();
   }, [loadHistory]);
 
+  // Event-driven refresh - natychmiastowa aktualizacja
+  useEffect(() => {
+    const handleHistoryUpdate = () => {
+      console.info('Historia czatów - otrzymano event aktualizacji');
+      loadHistory();
+    };
+
+    // Nasłuchuj custom events
+    window.addEventListener('chatHistoryUpdate', handleHistoryUpdate);
+    window.addEventListener('newConversationCreated', handleHistoryUpdate);
+    window.addEventListener('messageReceived', handleHistoryUpdate);
+
+    return () => {
+      window.removeEventListener('chatHistoryUpdate', handleHistoryUpdate);
+      window.removeEventListener('newConversationCreated', handleHistoryUpdate);
+      window.removeEventListener('messageReceived', handleHistoryUpdate);
+    };
+  }, [loadHistory]);
+
   // Periodic cache cleanup
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
@@ -219,6 +283,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     loadHistory,
     searchConversations,
     selectConversation,
+    loadConversationMessages,
     deleteConversation,
     updateConversationTitle,
     clearSearch,

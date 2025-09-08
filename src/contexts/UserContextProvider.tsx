@@ -120,7 +120,7 @@ export const UserContextProvider: React.FC<UserContextProviderProps> = ({ childr
 
     // Process authentication changes
     handleAuthenticationChange();
-  }, [accounts, inProgress, currentUserId]);
+  }, [accounts, inProgress]); // Usunięto currentUserId z zależności aby uniknąć pętli
 
   // Cleanup expired sessions periodically
   useEffect(() => {

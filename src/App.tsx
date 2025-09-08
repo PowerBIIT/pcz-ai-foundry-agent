@@ -16,11 +16,13 @@ import ExportDialog from './components/Export/ExportDialog';
 import { savedResponsesService } from './services/SavedResponsesService';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useSlashCommands } from './hooks/useSlashCommands';
+import { triggerHistoryRefresh, triggerMessageReceived, useChatHistory } from './hooks/useChatHistory';
 import Icons from './components/Icons/IconSystem';
 import { IconButton } from './components/Icons/IconContainer';
-import ErrorBoundary, { MiniError } from './components/ErrorBoundary/ErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import { AgentResponseSkeleton } from './components/LoadingSkeleton/LoadingSkeleton';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
+import TestChatHistory from './TestChatHistory';
 import 'react-toastify/dist/ReactToastify.css';
 import './App-ultra-modern.css';
 
@@ -38,6 +40,47 @@ const ChatInterface: React.FC = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [accessToken, setAccessToken] = useState<string>('');
+
+  // Get access token for chat history
+  React.useEffect(() => {
+    const getToken = async () => {
+      if (isAuthenticated && accounts[0]) {
+        try {
+          const tokenResponse = await instance.acquireTokenSilent({
+            scopes: ["https://ai.azure.com/.default"],
+            account: accounts[0]
+          });
+          setAccessToken(tokenResponse.accessToken);
+          console.info('Access token obtained for chat history');
+        } catch (error) {
+          console.error('Failed to get token for chat history:', error);
+        }
+      }
+    };
+    getToken();
+  }, [isAuthenticated, accounts, instance]);
+  
+  // Chat History Hook
+  const { conversations, loadConversationMessages } = useChatHistory(currentUserId, {
+    autoRefresh: true,
+    token: accessToken,
+    onConversationSelect: async (threadId) => {
+      console.info(`Selected conversation: ${threadId}`);
+      toast.info(`Ładowanie rozmowy: ${threadId.substring(0, 12)}...`);
+      
+      // Load messages from selected conversation
+      try {
+        const conversationMessages = await loadConversationMessages(threadId);
+        setMessages(conversationMessages);
+        console.info(`Loaded ${conversationMessages.length} messages from conversation ${threadId}`);
+        toast.success('Rozmowa została załadowana');
+      } catch (error) {
+        console.error('Failed to load conversation messages:', error);
+        toast.error('Błąd ładowania rozmowy');
+      }
+    }
+  });
   
   // Power User Features
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -223,6 +266,10 @@ const ChatInterface: React.FC = () => {
         
         console.log('Adding assistant message to UI:', assistantMessage);
         setMessages(prev => [...prev, assistantMessage]);
+        
+        // 🚀 Natychmiast odśwież historię po otrzymaniu odpowiedzi
+        triggerMessageReceived();
+        console.info('Historia czatów - wysłano event aktualizacji po otrzymaniu wiadomości');
       } else {
         console.error('Invalid assistant response:', assistantResponse);
         throw new Error('Otrzymano nieprawidłową odpowiedź od AI');
@@ -289,6 +336,10 @@ const ChatInterface: React.FC = () => {
   const handleNewConversation = () => {
     setMessages([]);
     toast.info('Rozpoczęto nową rozmowę');
+    
+    // 🚀 Odśwież historię po przełączeniu na nową rozmowę
+    triggerHistoryRefresh();
+    console.info('Historia czatów - wysłano event aktualizacji po rozpoczęciu nowej rozmowy');
   };
 
   const handleSaveResponse = async (message: ChatMessage) => {
@@ -419,17 +470,56 @@ const ChatInterface: React.FC = () => {
           
           <div className="chat-history">
             <div className="history-section">
-              <h3>Dzisiaj</h3>
-              <div className="history-item active">
-                <span className="history-title">Aktualna rozmowa</span>
+              <h3>Historia rozmów</h3>
+              
+              {/* Current session info */}
+              <div style={{fontSize: '11px', color: '#666', marginBottom: '12px', padding: '6px 8px', background: 'rgba(124, 58, 237, 0.1)', borderRadius: '4px'}}>
+                Aktywna: {currentThreadId?.substring(0, 12)}...
               </div>
-            </div>
-            
-            <div className="history-section">
-              <h3>Historia</h3>
-              <div className="history-empty">
-                <span className="empty-text">Brak wcześniejszych rozmów</span>
-              </div>
+              
+              {currentUserId && conversations.length > 0 ? (
+                <div className="conversations-list">
+                  {conversations.map((conv, index) => (
+                    <div 
+                      key={conv.threadId}
+                      className={`history-item ${conv.isActive ? 'active' : ''}`}
+                      onClick={async () => {
+                        console.info(`Clicking conversation: ${conv.threadId}`);
+                        toast.info(`Ładowanie rozmowy: ${conv.title}`);
+                        
+                        // Load messages from selected conversation
+                        try {
+                          const conversationMessages = await loadConversationMessages(conv.threadId);
+                          setMessages(conversationMessages);
+                          console.info(`Loaded ${conversationMessages.length} messages from conversation ${conv.threadId}`);
+                          toast.success('Rozmowa została załadowana');
+                        } catch (error) {
+                          console.error('Failed to load conversation messages:', error);
+                          toast.error('Błąd ładowania rozmowy');
+                        }
+                      }}
+                      title={`${conv.title} - ${conv.messageCount} wiadomości`}
+                    >
+                      <span className="history-title">
+                        {conv.isActive ? '🟢' : '💬'} {conv.title}
+                      </span>
+                      <small style={{display: 'block', marginTop: '2px', opacity: '0.6', fontSize: '10px'}}>
+                        {conv.messageCount} msg • {conv.threadId.substring(0, 8)}...
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ) : currentUserId ? (
+                <div className="history-empty">
+                  <span className="empty-text">
+                    {conversations.length === 0 ? 'Ładowanie rozmów...' : 'Brak rozmów'}
+                  </span>
+                </div>
+              ) : (
+                <div className="history-empty">
+                  <span className="empty-text">Zaloguj się aby zobaczyć historię</span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -761,6 +851,28 @@ const ChatInterface: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const [isTestMode, setIsTestMode] = React.useState(
+    window.location.pathname === '/test' || window.location.hash.includes('test')
+  );
+
+  // Listen for hash changes
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      setIsTestMode(window.location.pathname === '/test' || window.location.hash.includes('test'));
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+  
+  if (isTestMode) {
+    return (
+      <ErrorBoundary>
+        <TestChatHistory />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <MsalProvider instance={msalInstance}>

@@ -239,7 +239,7 @@ export class ChatService {
   /**
    * Get all messages from a specific thread
    */
-  private async getThreadAllMessages(threadId: string, token: string): Promise<ChatMessage[]> {
+  async getThreadAllMessages(threadId: string, token: string): Promise<ChatMessage[]> {
     const response = await fetch(
       `${this.endpoint}/threads/${threadId}/messages?api-version=2025-05-01&limit=100`,
       {
@@ -284,9 +284,8 @@ export class ChatService {
       const threadData = await threadResponse.json();
       const newThreadId = threadData.id;
 
-      // Create new session with the real thread ID - need to update UserSessionService
-      // For now, create session with mock ID and update later
-      const session = await userSessionService.createNewSession(userId);
+      // Create new session with the real thread ID
+      await userSessionService.createNewSession(userId);
       
       console.info(`Created new conversation thread for user ${userId}: ${newThreadId}`);
       return newThreadId;

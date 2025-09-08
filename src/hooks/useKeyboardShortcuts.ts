@@ -1,7 +1,7 @@
 // Keyboard Shortcuts Hook - Power User Features
 // Sprint 3 - Professional Tools
 
-import { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 
 export interface ShortcutAction {
@@ -25,8 +25,8 @@ export interface UseKeyboardShortcutsOptions {
 }
 
 export const useKeyboardShortcuts = (options: UseKeyboardShortcutsOptions) => {
-  // Define all shortcuts
-  const shortcuts: ShortcutAction[] = [
+  // Define all shortcuts using useMemo to prevent re-creation on every render
+  const shortcuts: ShortcutAction[] = React.useMemo(() => [
     {
       key: 'Enter',
       ctrlKey: true,
@@ -74,7 +74,7 @@ export const useKeyboardShortcuts = (options: UseKeyboardShortcutsOptions) => {
       description: 'Pomoc',
       category: 'general'
     }
-  ];
+  ], [options]);
 
   // Handle keydown events
   const handleKeyDown = useCallback((event: KeyboardEvent) => {

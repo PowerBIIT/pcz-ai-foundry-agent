@@ -27,7 +27,6 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   const [editTitle, setEditTitle] = useState('');
 
   const {
-    conversations,
     filteredConversations,
     isLoading,
     error,
