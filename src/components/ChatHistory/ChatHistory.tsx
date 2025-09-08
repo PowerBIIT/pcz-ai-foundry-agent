@@ -14,6 +14,7 @@ interface ChatHistoryProps {
   onConversationSelect?: (threadId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  token?: string;
 }
 
 export const ChatHistory: React.FC<ChatHistoryProps> = ({
@@ -21,7 +22,8 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   currentThreadId,
   onConversationSelect,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  token
 }) => {
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -37,11 +39,14 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     searchConversations,
     selectConversation,
     deleteConversation,
+    deleteAllConversations,
     updateConversationTitle,
     clearSearch
   } = useChatHistory(userId, {
     autoRefresh: true,
     refreshInterval: 5,
+    token,
+    currentThreadId: currentThreadId || undefined,
     onConversationSelect,
     onError: (error) => {
       console.error('Chat history error:', error);
@@ -70,6 +75,18 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     
     if (window.confirm('Czy na pewno chcesz usunąć tę rozmowę?')) {
       deleteConversation(threadId);
+    }
+  };
+
+  const handleDeleteAllClick = () => {
+    const conversationCount = filteredConversations.length;
+    const message = `Czy na pewno chcesz usunąć wszystkie ${conversationCount} rozmów?\n\nTa operacja jest nieodwracalna i usunie wszystkie rozmowy z Azure AI Foundry.`;
+    
+    if (window.confirm(message)) {
+      // Double confirmation for safety
+      if (window.confirm(`OSTATNIE OSTRZEŻENIE: Wszystkie ${conversationCount} rozmów zostaną trwale usunięte. Kontynuować?`)) {
+        deleteAllConversations();
+      }
     }
   };
 
@@ -125,9 +142,35 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
       {/* Header */}
       <div className="history-header">
         <div className="header-content">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
             <Icons.MessageSquare size={18} />
-            <h3>Historia rozmów</h3>
+            <h3 style={{ marginRight: 'auto' }}>Historia rozmów</h3>
+            {!isCollapsed && filteredConversations.length > 0 && (
+              <button 
+                onClick={handleDeleteAllClick}
+                className="delete-all-btn"
+                title={`Usuń wszystkie rozmowy (${filteredConversations.length})`}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'background-color 0.2s',
+                  marginRight: '8px'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#c82333'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc3545'}
+              >
+                <Icons.Trash size={12} />
+                Usuń wszystkie
+              </button>
+            )}
           </div>
           <button 
             onClick={onToggleCollapse}

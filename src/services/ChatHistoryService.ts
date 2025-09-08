@@ -31,40 +31,150 @@ export interface ConversationSummary {
 export class ChatHistoryService {
   private endpoint: string;
   private readonly STORAGE_KEY = 'pcz-agent-chat-history';
+  private readonly THREAD_CACHE_KEY = 'pcz-agent-thread-cache';
+  private readonly KNOWN_THREADS_KEY = 'pcz-agent-known-threads';
+  private threadVerificationCache: Map<string, { verified: boolean; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor(endpoint: string = agentConfig.endpoint) {
     this.endpoint = endpoint;
+    // Load cached thread verification data on initialization
+    this.loadThreadCacheFromStorage();
   }
 
   /**
-   * Get conversation history for user
+   * Add known Azure thread IDs (for manual discovery)
+   */
+  addKnownThreads(threadIds: string[]): void {
+    try {
+      const stored = localStorage.getItem(this.KNOWN_THREADS_KEY);
+      const knownThreads = stored ? JSON.parse(stored) : [];
+      const updated = Array.from(new Set([...knownThreads, ...threadIds]));
+      localStorage.setItem(this.KNOWN_THREADS_KEY, JSON.stringify(updated));
+      console.info(`Added ${threadIds.length} known threads, total: ${updated.length}`);
+    } catch (error) {
+      console.error('Failed to add known threads:', error);
+    }
+  }
+
+  /**
+   * Get all known thread IDs
+   */
+  private getKnownThreads(): string[] {
+    try {
+      const stored = localStorage.getItem(this.KNOWN_THREADS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.warn('Failed to load known threads:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch all threads from Azure AI Foundry API
+   */
+  async fetchAllThreadsFromAzure(token: string): Promise<string[]> {
+    try {
+      const allThreads: string[] = [];
+      let after = '';
+      let hasMore = true;
+      
+      while (hasMore) {
+        const url = `${this.endpoint}/threads?api-version=2025-05-15-preview&limit=100&order=desc${after ? `&after=${after}` : ''}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+          console.warn(`Failed to fetch threads from Azure: ${response.status}`);
+          break;
+        }
+        
+        const data = await response.json();
+        
+        if (data.data && Array.isArray(data.data)) {
+          const threadIds = data.data.map((thread: any) => thread.id);
+          allThreads.push(...threadIds);
+          console.info(`Fetched ${threadIds.length} threads from Azure (total: ${allThreads.length})`);
+        }
+        
+        // Check if there are more pages
+        hasMore = data.has_more === true;
+        if (hasMore && data.data && data.data.length > 0) {
+          after = data.data[data.data.length - 1].id;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      console.info(`Successfully fetched ${allThreads.length} threads from Azure AI Foundry`);
+      return allThreads;
+      
+    } catch (error) {
+      console.error('Failed to fetch threads from Azure:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get conversation history for user with enhanced Azure synchronization
    */
   async getConversationHistory(userId: string, token: string, limit = 50): Promise<ConversationMetadata[]> {
     try {
-      // Get all user threads
-      const userThreads = await userSessionService.getUserThreads(userId);
+      // Get threads from multiple sources including AZURE API
+      const [localThreads, allLocalThreads, knownThreads, azureThreads] = await Promise.all([
+        userSessionService.getUserThreads(userId),
+        userSessionService.getAllUserThreads(),
+        Promise.resolve(this.getKnownThreads()),
+        this.fetchAllThreadsFromAzure(token)
+      ]);
+      
+      // Combine and deduplicate thread IDs from all sources
+      const allThreads = Array.from(new Set([...localThreads, ...allLocalThreads, ...knownThreads, ...azureThreads]));
+      console.info(`Found ${allThreads.length} unique threads (${localThreads.length} user, ${allLocalThreads.length} total, ${knownThreads.length} known, ${azureThreads.length} from Azure)`);
+      
       const conversations: ConversationMetadata[] = [];
+      const verificationPromises: Promise<void>[] = [];
 
-      for (const threadId of userThreads) {
-        try {
-          // Verify authorization
-          const authorized = await userSessionService.authorizeThreadAccess(userId, threadId);
-          if (!authorized) {
-            console.warn(`Unauthorized access to thread ${threadId} for user ${userId}`);
-            continue;
+      for (const threadId of allThreads) {
+        // Parallel verification and loading
+        const promise = (async () => {
+          try {
+            // Try to verify thread exists in Azure (with cache)
+            const exists = await this.verifyThreadExistsWithCache(threadId, token);
+            if (!exists) {
+              console.info(`Thread ${threadId} no longer exists in Azure, skipping`);
+              return;
+            }
+
+            // Register thread with user if it exists in Azure
+            await userSessionService.registerAzureThread(userId, threadId);
+            
+            // Check authorization
+            const authorized = await userSessionService.authorizeThreadAccess(userId, threadId);
+            if (!authorized) {
+              console.warn(`Unauthorized access to thread ${threadId} for user ${userId}`);
+              return;
+            }
+
+            // Get conversation metadata
+            const metadata = await this.getConversationMetadata(threadId, userId, token);
+            if (metadata && metadata.messageCount > 0) {
+              conversations.push(metadata);
+            }
+
+          } catch (error) {
+            console.warn(`Failed to load metadata for thread ${threadId}:`, error);
           }
-
-          // Get conversation metadata
-          const metadata = await this.getConversationMetadata(threadId, userId, token);
-          if (metadata && metadata.messageCount > 0) {
-            conversations.push(metadata);
-          }
-
-        } catch (error) {
-          console.warn(`Failed to load metadata for thread ${threadId}:`, error);
-          // Continue with other threads
-        }
+        })();
+        
+        verificationPromises.push(promise);
       }
+      
+      // Wait for all verifications to complete
+      await Promise.all(verificationPromises);
 
       // Deduplicate by threadId (usuwamy duplikaty)
       const unique = conversations.filter((conv, index, arr) => 
@@ -211,7 +321,7 @@ export class ChatHistoryService {
   /**
    * Delete conversation
    */
-  async deleteConversation(threadId: string, userId: string): Promise<void> {
+  async deleteConversation(threadId: string, userId: string, token?: string): Promise<void> {
     try {
       // Verify authorization
       const authorized = await userSessionService.authorizeThreadAccess(userId, threadId);
@@ -219,11 +329,38 @@ export class ChatHistoryService {
         throw new UnauthorizedThreadAccessError(userId, threadId);
       }
 
+      // Delete from Azure AI Foundry if token is provided
+      if (token) {
+        try {
+          const deleteResponse = await fetch(
+            `${this.endpoint}/threads/${threadId}?api-version=2025-05-01`,
+            {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            }
+          );
+          
+          if (deleteResponse.ok) {
+            console.info(`Successfully deleted thread ${threadId} from Azure AI Foundry`);
+          } else if (deleteResponse.status === 404) {
+            console.warn(`Thread ${threadId} already deleted from Azure or doesn't exist`);
+          } else {
+            console.error(`Failed to delete thread from Azure: ${deleteResponse.status}`);
+            // Continue with local cleanup even if Azure delete fails
+          }
+        } catch (azureError) {
+          console.error(`Error deleting thread from Azure:`, azureError);
+          // Continue with local cleanup even if Azure delete fails
+        }
+      }
+
       // Remove from cache
       this.removeCachedMetadata(threadId);
       
-      // In real implementation, could also delete from Azure
-      // For now, just deactivate in session service
+      // Remove from known threads
+      const knownThreads = this.getKnownThreads();
+      const updatedThreads = knownThreads.filter(id => id !== threadId);
+      localStorage.setItem(this.KNOWN_THREADS_KEY, JSON.stringify(updatedThreads));
       
       console.info(`Conversation ${threadId} deleted for user ${userId}`);
 
@@ -361,16 +498,103 @@ export class ChatHistoryService {
   }
 
   /**
-   * Check if metadata is fresh (within 5 minutes)
+   * Check if metadata is fresh (within TTL)
    */
   private isMetadataFresh(metadata: any): boolean {
     if (!metadata.cachedAt) return false;
     
     const cached = new Date(metadata.cachedAt);
     const now = new Date();
-    const ageMinutes = (now.getTime() - cached.getTime()) / (1000 * 60);
+    const age = now.getTime() - cached.getTime();
     
-    return ageMinutes < 5; // Fresh for 5 minutes
+    return age < this.CACHE_TTL;
+  }
+
+  /**
+   * Verify thread exists in Azure with cache
+   */
+  private async verifyThreadExistsWithCache(threadId: string, token: string): Promise<boolean> {
+    // Check memory cache first
+    const cached = this.threadVerificationCache.get(threadId);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+      return cached.verified;
+    }
+
+    try {
+      // Make actual API call to verify thread exists in Azure AI Foundry
+      const response = await fetch(
+        `${this.endpoint}/threads/${threadId}?api-version=2025-05-01`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      const exists = response.ok;
+      
+      // Cache the result
+      this.threadVerificationCache.set(threadId, {
+        verified: exists,
+        timestamp: Date.now()
+      });
+
+      // Also save to localStorage for persistence
+      this.saveThreadCacheToStorage();
+
+      if (!exists) {
+        console.info(`Thread ${threadId} does not exist in Azure AI Foundry`);
+      }
+
+      return exists;
+    } catch (error) {
+      console.warn(`Error verifying thread ${threadId} in Azure:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Save thread verification cache to localStorage
+   */
+  private saveThreadCacheToStorage(): void {
+    try {
+      const cacheData = Array.from(this.threadVerificationCache.entries()).map(([key, value]) => ({
+        threadId: key,
+        ...value
+      }));
+      
+      localStorage.setItem(this.THREAD_CACHE_KEY, JSON.stringify({
+        data: cacheData,
+        savedAt: Date.now()
+      }));
+    } catch (error) {
+      console.warn('Failed to save thread cache:', error);
+    }
+  }
+
+  /**
+   * Load thread verification cache from localStorage
+   */
+  private loadThreadCacheFromStorage(): void {
+    try {
+      const stored = localStorage.getItem(this.THREAD_CACHE_KEY);
+      if (!stored) return;
+
+      const cache = JSON.parse(stored);
+      if (!cache.data || (Date.now() - cache.savedAt) > this.CACHE_TTL) {
+        return; // Cache too old
+      }
+
+      cache.data.forEach((item: any) => {
+        if ((Date.now() - item.timestamp) < this.CACHE_TTL) {
+          this.threadVerificationCache.set(item.threadId, {
+            verified: item.verified,
+            timestamp: item.timestamp
+          });
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to load thread cache:', error);
+    }
   }
 
   /**
@@ -378,12 +602,12 @@ export class ChatHistoryService {
    */
   async getThreadRealMessages(threadId: string, token: string): Promise<ChatMessage[]> {
     try {
-      console.info(`Loading real messages for thread ${threadId}`);
+      console.info(`Loading real messages from Azure AI Foundry for thread ${threadId}`);
       const messages = await chatService.getThreadAllMessages(threadId, token);
-      console.info(`Found ${messages.length} real messages in thread ${threadId}`);
+      console.info(`Successfully loaded ${messages.length} real messages from Azure for thread ${threadId}`);
       return messages;
     } catch (error) {
-      console.warn(`Failed to get real messages from thread ${threadId}:`, error);
+      console.error(`Failed to get real messages from Azure AI Foundry thread ${threadId}:`, error);
       return [];
     }
   }
@@ -524,6 +748,98 @@ export class ChatHistoryService {
 
     } catch (error) {
       console.error('Failed to cleanup chat history cache:', error);
+    }
+  }
+
+  /**
+   * Delete all conversations for a user
+   */
+  async deleteAllConversations(userId: string, token?: string): Promise<{ deleted: number; failed: number }> {
+    try {
+      console.info(`Starting deletion of all conversations for user ${userId}`);
+      
+      // Get all user threads
+      const userThreads = await userSessionService.getUserThreads(userId);
+      
+      if (userThreads.length === 0) {
+        console.info('No conversations to delete');
+        return { deleted: 0, failed: 0 };
+      }
+
+      console.info(`Found ${userThreads.length} conversations to delete`);
+      
+      let deleted = 0;
+      let failed = 0;
+
+      // Delete threads in parallel batches (10 at a time to avoid overwhelming the API)
+      const batchSize = 10;
+      for (let i = 0; i < userThreads.length; i += batchSize) {
+        const batch = userThreads.slice(i, i + batchSize);
+        
+        const deletePromises = batch.map(async (threadId) => {
+          try {
+            // Delete from Azure if token provided
+            if (token) {
+              const deleteResponse = await fetch(
+                `${this.endpoint}/threads/${threadId}?api-version=2025-05-01`,
+                {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `Bearer ${token}` }
+                }
+              );
+              
+              if (deleteResponse.ok) {
+                console.info(`Deleted thread ${threadId} from Azure`);
+              } else if (deleteResponse.status === 404) {
+                console.info(`Thread ${threadId} already deleted from Azure`);
+              } else {
+                console.error(`Failed to delete thread ${threadId}: ${deleteResponse.status}`);
+                failed++;
+                return;
+              }
+            }
+            
+            // Remove from local cache
+            this.removeCachedMetadata(threadId);
+            deleted++;
+            
+          } catch (error) {
+            console.error(`Error deleting thread ${threadId}:`, error);
+            failed++;
+          }
+        });
+        
+        await Promise.all(deletePromises);
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < userThreads.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      // Clear all local storage for this user
+      try {
+        const stored = localStorage.getItem(this.STORAGE_KEY);
+        if (stored) {
+          const cache = JSON.parse(stored);
+          // Remove all entries for this user
+          for (const threadId in cache) {
+            if (cache[threadId].userId === userId) {
+              delete cache[threadId];
+            }
+          }
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cache));
+        }
+      } catch (error) {
+        console.warn('Failed to clear local cache:', error);
+      }
+
+      console.info(`Deletion complete: ${deleted} deleted, ${failed} failed`);
+      return { deleted, failed };
+      
+    } catch (error) {
+      console.error('Failed to delete all conversations:', error);
+      throw error;
     }
   }
 }

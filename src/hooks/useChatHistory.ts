@@ -33,6 +33,7 @@ export interface UseChatHistoryOptions {
   autoRefresh?: boolean;
   refreshInterval?: number; // minutes
   token?: string; // Azure access token
+  currentThreadId?: string; // Current active thread for UI updates
   onConversationSelect?: (threadId: string) => void;
   onError?: (error: Error) => void;
 }
@@ -174,7 +175,8 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     if (!userId) return;
 
     try {
-      await chatHistoryService.deleteConversation(threadId, userId);
+      // Pass token to enable Azure deletion
+      await chatHistoryService.deleteConversation(threadId, userId, options?.token);
       
       // Remove from state
       setState(prev => ({
@@ -183,13 +185,13 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
         filteredConversations: prev.filteredConversations.filter(c => c.threadId !== threadId)
       }));
 
-      toast.success('Rozmowa została usunięta');
+      toast.success('Rozmowa została usunięta z Azure AI Foundry');
 
     } catch (error) {
       console.error('Failed to delete conversation:', error);
       toast.error('Błąd usuwania rozmowy');
     }
-  }, [userId]);
+  }, [userId, options?.token]);
 
   /**
    * Update conversation title
@@ -230,6 +232,45 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     }));
   }, []);
 
+  /**
+   * Delete all conversations
+   */
+  const deleteAllConversations = useCallback(async () => {
+    if (!userId || !options?.token) {
+      console.warn('Cannot delete all conversations: missing userId or token');
+      return;
+    }
+
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const result = await chatHistoryService.deleteAllConversations(userId, options.token);
+      
+      // Clear state
+      setState(prev => ({
+        ...prev,
+        conversations: [],
+        filteredConversations: [],
+        summary: null,
+        isLoading: false
+      }));
+
+      if (result.failed > 0) {
+        toast.warning(`Usunięto ${result.deleted} rozmów, ${result.failed} nie udało się usunąć`);
+      } else {
+        toast.success(`Wszystkie rozmowy (${result.deleted}) zostały usunięte z Azure AI Foundry`);
+      }
+
+      // Trigger refresh event
+      triggerHistoryRefresh();
+
+    } catch (error) {
+      console.error('Failed to delete all conversations:', error);
+      setState(prev => ({ ...prev, isLoading: false }));
+      toast.error('Błąd usuwania wszystkich rozmów');
+    }
+  }, [userId, options?.token]);
+
   // Auto-refresh effect
   useEffect(() => {
     if (options?.autoRefresh && userId) {
@@ -266,6 +307,25 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     };
   }, [loadHistory]);
 
+  // Update isActive when currentThreadId changes - ULTRA SIMPLE
+  useEffect(() => {
+    if (options?.currentThreadId && state.conversations.length > 0) {
+      console.info(`Updating isActive for currentThreadId: ${options.currentThreadId}`);
+      
+      setState(prev => ({
+        ...prev,
+        conversations: prev.conversations.map(conv => ({
+          ...conv,
+          isActive: conv.threadId === options.currentThreadId
+        })),
+        filteredConversations: prev.filteredConversations.map(conv => ({
+          ...conv,
+          isActive: conv.threadId === options.currentThreadId
+        }))
+      }));
+    }
+  }, [options?.currentThreadId, state.conversations.length]);
+
   // Periodic cache cleanup
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
@@ -285,6 +345,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     selectConversation,
     loadConversationMessages,
     deleteConversation,
+    deleteAllConversations,
     updateConversationTitle,
     clearSearch,
     

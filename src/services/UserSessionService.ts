@@ -76,16 +76,16 @@ export class UserSessionService {
   /**
    * Create a new session for a user
    */
-  async createNewSession(userId: string, userInfo?: { displayName?: string; email?: string }): Promise<UserSession> {
+  async createNewSession(userId: string, userInfo?: { displayName?: string; email?: string }, threadId?: string): Promise<UserSession> {
     await this.ensureInitialized();
 
     try {
-      // Create new Azure AI Foundry thread
-      const threadId = await this.createAzureThread();
+      // Use provided threadId or create new Azure AI Foundry thread
+      const actualThreadId = threadId || await this.createAzureThread();
       
       const session: UserSession = {
         userId,
-        threadId,
+        threadId: actualThreadId,
         lastActive: new Date(),
         isActive: true,
         metadata: {
@@ -100,7 +100,7 @@ export class UserSessionService {
       this.sessions.set(session.threadId, session);
       this.persistSessions();
 
-      console.info(`Created new session: ${userId} → ${threadId}`);
+      console.info(`Created new session: ${userId} → ${actualThreadId}`);
       return session;
 
     } catch (error) {
@@ -177,39 +177,43 @@ export class UserSessionService {
   async authorizeThreadAccess(userId: string, threadId: string): Promise<boolean> {
     await this.ensureInitialized();
 
-    // Find current session for user
-    const session = Array.from(this.sessions.values())
-      .filter(s => s.userId === userId)
-      .sort((a, b) => (b.metadata?.sessionStart?.getTime() || 0) - (a.metadata?.sessionStart?.getTime() || 0))[0];
-    if (!session) {
-      return false;
+    // Check if thread is registered to this user
+    const threadSession = this.sessions.get(threadId);
+    if (threadSession && threadSession.userId === userId) {
+      // Register it if not already done
+      if (!threadSession.isActive) {
+        await this.registerAzureThread(userId, threadId);
+      }
+      return true;
     }
 
-    // Check if thread belongs to user
-    if (session.threadId !== threadId) {
-      // Also check if user has access to this thread through thread history
-      const userThreads = await this.getUserThreads(userId);
-      return userThreads.includes(threadId);
+    // Check all user sessions
+    const userSessions = Array.from(this.sessions.values())
+      .filter(s => s.userId === userId);
+    
+    // Check if thread belongs to user through any session
+    const hasAccess = userSessions.some(s => s.threadId === threadId);
+    if (hasAccess) {
+      return true;
     }
 
-    // Check if session is still valid
-    if (!session.isActive) {
-      return false;
+    // Also check if user has access to this thread through thread history
+    const userThreads = await this.getUserThreads(userId);
+    if (userThreads.includes(threadId)) {
+      // Register the thread for future access
+      await this.registerAzureThread(userId, threadId);
+      return true;
     }
 
-    // Check if session has expired
-    const now = new Date();
-    const sessionAge = now.getTime() - session.lastActive.getTime();
-    const maxAge = 60 * 60 * 1000; // 1 hour
-
-    if (sessionAge > maxAge) {
-      console.warn(`Session expired for user ${userId}`);
-      session.isActive = false;
-      this.updateSession(session);
-      return false;
+    // For Azure threads that exist but aren't registered yet,
+    // register them to the user (this handles discovered threads)
+    if (threadId.startsWith('thread_') && threadId.length > 20) {
+      console.info(`Registering discovered Azure thread ${threadId} for user ${userId}`);
+      await this.registerAzureThread(userId, threadId);
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   /**
@@ -221,6 +225,20 @@ export class UserSessionService {
     const storage = SessionStorageManager.loadFromStorage();
     const userSessions = storage.sessions.filter(s => s.userId === userId);
     return userSessions.map(s => s.threadId);
+  }
+
+  /**
+   * Get all user threads across all users (for Azure sync)
+   */
+  async getAllUserThreads(): Promise<string[]> {
+    await this.ensureInitialized();
+
+    const storage = SessionStorageManager.loadFromStorage();
+    const allThreads = storage.sessions.map(s => s.threadId);
+    const uniqueThreads = Array.from(new Set(allThreads)); // Remove duplicates
+    
+    console.info(`Found ${uniqueThreads.length} unique threads in local storage`);
+    return uniqueThreads;
   }
 
   /**
@@ -241,6 +259,35 @@ export class UserSessionService {
   updateSession(session: UserSession): void {
     this.sessions.set(session.threadId, session);
     this.persistSessions();
+  }
+
+  /**
+   * Register an Azure thread with a user (for discovered threads)
+   */
+  async registerAzureThread(userId: string, threadId: string): Promise<void> {
+    await this.ensureInitialized();
+    
+    // Check if thread already exists
+    if (this.sessions.has(threadId)) {
+      console.info(`Thread ${threadId} already registered`);
+      return;
+    }
+
+    // Create session for discovered Azure thread
+    const session: UserSession = {
+      userId,
+      threadId,
+      lastActive: new Date(),
+      isActive: false, // Not active since it's a discovered thread
+      metadata: {
+        sessionStart: new Date(),
+        messageCount: 0
+      }
+    };
+
+    this.sessions.set(threadId, session);
+    this.persistSessions();
+    console.info(`Registered Azure thread ${threadId} for user ${userId}`);
   }
 
   /**
