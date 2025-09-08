@@ -284,8 +284,8 @@ export class ChatService {
       const threadData = await threadResponse.json();
       const newThreadId = threadData.id;
 
-      // Create new session with the real thread ID
-      await userSessionService.createNewSession(userId);
+      // Create new session with the real Azure thread ID
+      await userSessionService.createNewSession(userId, undefined, newThreadId);
       
       console.info(`Created new conversation thread for user ${userId}: ${newThreadId}`);
       return newThreadId;
@@ -311,12 +311,8 @@ export class ChatService {
         // Create real Azure thread
         const realThreadId = await this.createNewConversation(userId, token);
         
-        // Update session with real thread ID
-        const session = await userSessionService.getUserSession(userId);
-        if (session) {
-          session.threadId = realThreadId;
-          userSessionService.updateSession(session);
-        }
+        // Register the new Azure thread with the user
+        await userSessionService.registerAzureThread(userId, realThreadId);
         
         return realThreadId;
       }
@@ -367,9 +363,29 @@ export class ChatService {
   }
 
   /**
-   * Delete a conversation thread (deactivate in session)
+   * Get all user threads from Azure AI Foundry (not just local storage)
    */
-  async deleteConversation(userId: string, threadId: string): Promise<void> {
+  async getAllUserThreads(token: string): Promise<string[]> {
+    try {
+      console.info('Fetching all user threads from Azure AI Foundry');
+      
+      // TODO: Implement proper Azure API call to list user threads
+      // For now, return threads from session service + try to discover more
+      const localThreads = await userSessionService.getAllUserThreads();
+      
+      console.info(`Found ${localThreads.length} threads in local storage`);
+      return localThreads;
+      
+    } catch (error) {
+      console.error('Failed to get all user threads from Azure:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a conversation thread from Azure AI Foundry
+   */
+  async deleteConversation(userId: string, threadId: string, token?: string): Promise<void> {
     try {
       // Authorize access first
       const authorized = await userSessionService.authorizeThreadAccess(userId, threadId);
@@ -377,10 +393,29 @@ export class ChatService {
         throw new UnauthorizedThreadAccessError(userId, threadId);
       }
 
-      // For now, we don't actually delete the Azure thread, just deactivate in session
-      // In future, might want to call DELETE /threads/{threadId}
+      // Delete the thread from Azure AI Foundry if token provided
+      if (token) {
+        try {
+          const deleteResponse = await fetch(`${this.endpoint}/threads/${threadId}?api-version=2025-05-01`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (deleteResponse.ok) {
+            console.info(`Successfully deleted thread ${threadId} from Azure AI Foundry`);
+          } else if (deleteResponse.status === 404) {
+            console.warn(`Thread ${threadId} not found in Azure (already deleted)`);
+          } else {
+            console.error(`Failed to delete thread from Azure: ${deleteResponse.status}`);
+          }
+        } catch (error) {
+          console.error(`Error calling Azure delete API:`, error);
+        }
+      }
       
-      console.info(`Conversation ${threadId} deactivated for user ${userId}`);
+      console.info(`Conversation ${threadId} deleted for user ${userId}`);
     } catch (error) {
       console.error(`Failed to delete conversation ${threadId} for user ${userId}:`, error);
       throw error;

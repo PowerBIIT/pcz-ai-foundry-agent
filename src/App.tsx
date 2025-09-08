@@ -22,7 +22,6 @@ import { IconButton } from './components/Icons/IconContainer';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import { AgentResponseSkeleton } from './components/LoadingSkeleton/LoadingSkeleton';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
-import TestChatHistory from './TestChatHistory';
 import 'react-toastify/dist/ReactToastify.css';
 import './App-ultra-modern.css';
 
@@ -851,30 +850,7 @@ const ChatInterface: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const [isTestMode, setIsTestMode] = React.useState(
-    window.location.pathname === '/test' || window.location.hash.includes('test')
-  );
-
-  // Listen for hash changes
-  React.useEffect(() => {
-    const handleHashChange = () => {
-      setIsTestMode(window.location.pathname === '/test' || window.location.hash.includes('test'));
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-  
-  if (isTestMode) {
-    return (
-      <ErrorBoundary>
-        <TestChatHistory />
-      </ErrorBoundary>
-    );
-  }
-
-  return (
-    <ErrorBoundary>
+  return (    <ErrorBoundary>
       <MsalProvider instance={msalInstance}>
         <UserContextProvider>
           <ErrorBoundary>

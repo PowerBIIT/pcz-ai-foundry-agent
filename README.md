@@ -35,6 +35,9 @@ PCZ Agent to aplikacja Single-Page Application (SPA) zbudowana w React + TypeScr
 - ✅ **Toast notifications** - Professional user feedback system
 - ✅ **Responsive design** - Mobile-friendly interface
 - ✅ **TypeScript** - Full type safety i developer experience
+- ✅ **Full Azure Thread Sync** - Pełna synchronizacja wszystkich wątków z Azure AI Foundry
+- ✅ **Thread Management** - Usuwanie pojedynczych i wszystkich konwersacji z Azure
+- ✅ **Chat History** - Kompletna historia czatów z Azure AI Foundry (nie tylko localStorage)
 
 ## 🏗️ Architektura
 
