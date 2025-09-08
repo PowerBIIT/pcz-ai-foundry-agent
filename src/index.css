@@ -1,0 +1,104 @@
+/* Import Design System Foundation */
+@import './styles/design-system.css';
+
+/* Global Reset & Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--pcz-font-primary);
+  font-size: var(--pcz-text-base);
+  line-height: var(--pcz-leading-normal);
+  color: var(--pcz-neutral-900);
+  background-color: var(--pcz-neutral-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Typography Foundation */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--pcz-font-display);
+  font-weight: var(--pcz-font-weight-semibold);
+  line-height: var(--pcz-leading-tight);
+  color: var(--pcz-neutral-900);
+}
+
+h1 { font-size: var(--pcz-text-4xl); }
+h2 { font-size: var(--pcz-text-3xl); }
+h3 { font-size: var(--pcz-text-2xl); }
+h4 { font-size: var(--pcz-text-xl); }
+h5 { font-size: var(--pcz-text-lg); }
+h6 { font-size: var(--pcz-text-base); }
+
+p {
+  margin: 0 0 var(--pcz-space-4) 0;
+  color: var(--pcz-neutral-700);
+}
+
+code {
+  font-family: var(--pcz-font-mono);
+  font-size: 0.875em;
+  padding: var(--pcz-space-1) var(--pcz-space-2);
+  background-color: var(--pcz-neutral-100);
+  border-radius: var(--pcz-radius-sm);
+  color: var(--pcz-neutral-800);
+}
+
+/* Links */
+a {
+  color: var(--pcz-primary-500);
+  text-decoration: none;
+  transition: var(--pcz-transition-fast);
+}
+
+a:hover {
+  color: var(--pcz-primary-600);
+  text-decoration: underline;
+}
+
+a:focus {
+  outline: none;
+  box-shadow: var(--pcz-focus-ring);
+  border-radius: var(--pcz-radius-sm);
+}
+
+/* Form Elements Base */
+button, input, textarea, select {
+  font-family: inherit;
+}
+
+/* Focus Management - WCAG Compliance */
+:focus {
+  outline: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  box-shadow: var(--pcz-focus-ring);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,413 @@
+/*
+ * Professional Button Component - Sprint 4.2
+ * Apple/Microsoft/Bloomberg-level quality
+ * Full accessibility support
+ */
+
+/* ========================================
+ * BUTTON BASE STYLES
+ * ======================================== */
+
+.pcz-button {
+  /* Foundation from design system */
+  font-family: var(--pcz-font-primary);
+  font-weight: var(--pcz-font-weight-medium);
+  font-size: var(--pcz-text-base);
+  line-height: var(--pcz-leading-normal);
+  
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pcz-space-2);
+  
+  /* Sizing */
+  height: var(--pcz-button-height-base);
+  padding: 0 var(--pcz-space-6);
+  min-height: var(--pcz-touch-target-min); /* 44px for touch accessibility */
+  
+  /* Appearance */
+  border: 1px solid transparent;
+  border-radius: var(--pcz-radius-base);
+  background: var(--pcz-primary-500);
+  color: var(--pcz-neutral-0);
+  
+  /* Interaction */
+  cursor: pointer;
+  transition: var(--pcz-transition-base);
+  text-decoration: none;
+  user-select: none;
+  
+  /* Remove default button styles */
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* ========================================
+ * BUTTON VARIANTS - Professional Styles
+ * ======================================== */
+
+/* Primary Button (Default) */
+.pcz-button--primary {
+  background: var(--pcz-primary-500);
+  color: var(--pcz-neutral-0);
+  border-color: var(--pcz-primary-500);
+}
+
+.pcz-button--primary:hover:not(:disabled) {
+  background: var(--pcz-primary-600);
+  border-color: var(--pcz-primary-600);
+  transform: translateY(-1px);
+  box-shadow: var(--pcz-shadow-md);
+}
+
+.pcz-button--primary:active:not(:disabled) {
+  background: var(--pcz-primary-700);
+  border-color: var(--pcz-primary-700);
+  transform: translateY(0);
+  box-shadow: var(--pcz-shadow-sm);
+}
+
+/* Secondary Button */
+.pcz-button--secondary {
+  background: var(--pcz-neutral-0);
+  color: var(--pcz-primary-500);
+  border-color: var(--pcz-primary-500);
+}
+
+.pcz-button--secondary:hover:not(:disabled) {
+  background: var(--pcz-primary-50);
+  color: var(--pcz-primary-600);
+  border-color: var(--pcz-primary-600);
+  transform: translateY(-1px);
+  box-shadow: var(--pcz-shadow-md);
+}
+
+.pcz-button--secondary:active:not(:disabled) {
+  background: var(--pcz-primary-100);
+  transform: translateY(0);
+  box-shadow: var(--pcz-shadow-sm);
+}
+
+/* Success Button */
+.pcz-button--success {
+  background: var(--pcz-success);
+  color: var(--pcz-neutral-0);
+  border-color: var(--pcz-success);
+}
+
+.pcz-button--success:hover:not(:disabled) {
+  background: var(--pcz-success-dark);
+  border-color: var(--pcz-success-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--pcz-shadow-md);
+}
+
+/* Warning Button */
+.pcz-button--warning {
+  background: var(--pcz-warning);
+  color: var(--pcz-neutral-900);
+  border-color: var(--pcz-warning);
+}
+
+.pcz-button--warning:hover:not(:disabled) {
+  background: var(--pcz-warning-dark);
+  color: var(--pcz-neutral-0);
+  border-color: var(--pcz-warning-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--pcz-shadow-md);
+}
+
+/* Error/Danger Button */
+.pcz-button--error {
+  background: var(--pcz-error);
+  color: var(--pcz-neutral-0);
+  border-color: var(--pcz-error);
+}
+
+.pcz-button--error:hover:not(:disabled) {
+  background: var(--pcz-error-dark);
+  border-color: var(--pcz-error-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--pcz-shadow-md);
+}
+
+/* Ghost/Text Button */
+.pcz-button--ghost {
+  background: transparent;
+  color: var(--pcz-primary-500);
+  border-color: transparent;
+}
+
+.pcz-button--ghost:hover:not(:disabled) {
+  background: var(--pcz-primary-50);
+  color: var(--pcz-primary-600);
+}
+
+.pcz-button--ghost:active:not(:disabled) {
+  background: var(--pcz-primary-100);
+}
+
+/* ========================================
+ * BUTTON SIZES
+ * ======================================== */
+
+.pcz-button--sm {
+  height: var(--pcz-button-height-sm);
+  padding: 0 var(--pcz-space-4);
+  font-size: var(--pcz-text-sm);
+  min-height: 32px; /* Smaller touch target for secondary actions */
+}
+
+.pcz-button--lg {
+  height: var(--pcz-button-height-lg);
+  padding: 0 var(--pcz-space-8);
+  font-size: var(--pcz-text-lg);
+  font-weight: var(--pcz-font-weight-semibold);
+}
+
+/* ========================================
+ * BUTTON STATES - Professional Feedback
+ * ======================================== */
+
+/* Loading State */
+.pcz-button--loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.pcz-button--loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: pcz-button-spin 1s linear infinite;
+}
+
+@keyframes pcz-button-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Disabled State */
+.pcz-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.pcz-button:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ========================================
+ * ACCESSIBILITY - WCAG 2.1 AA Compliance
+ * ======================================== */
+
+/* Focus States */
+.pcz-button:focus-visible {
+  box-shadow: var(--pcz-focus-ring);
+}
+
+.pcz-button--error:focus-visible {
+  box-shadow: var(--pcz-focus-ring-error);
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .pcz-button {
+    border-width: 2px;
+  }
+  
+  .pcz-button--ghost {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .pcz-button {
+    transition: none;
+  }
+  
+  .pcz-button:hover:not(:disabled) {
+    transform: none;
+  }
+  
+  .pcz-button--loading::after {
+    animation: none;
+  }
+}
+
+/* ========================================
+ * BUTTON GROUPS & COMBINATIONS
+ * ======================================== */
+
+.pcz-button-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pcz-space-2);
+}
+
+.pcz-button-group--attached {
+  gap: 0;
+}
+
+.pcz-button-group--attached .pcz-button:not(:first-child):not(:last-child) {
+  border-radius: 0;
+  border-left-width: 0;
+}
+
+.pcz-button-group--attached .pcz-button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.pcz-button-group--attached .pcz-button:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-width: 0;
+}
+
+/* ========================================
+ * ICON BUTTONS - Expert Actions
+ * ======================================== */
+
+.pcz-button--icon {
+  width: var(--pcz-button-height-base);
+  height: var(--pcz-button-height-base);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pcz-radius-base);
+}
+
+.pcz-button--icon.pcz-button--sm {
+  width: var(--pcz-button-height-sm);
+  height: var(--pcz-button-height-sm);
+}
+
+.pcz-button--icon.pcz-button--lg {
+  width: var(--pcz-button-height-lg);
+  height: var(--pcz-button-height-lg);
+}
+
+/* Floating Action Button Style */
+.pcz-button--fab {
+  border-radius: var(--pcz-radius-full);
+  box-shadow: var(--pcz-shadow-lg);
+}
+
+.pcz-button--fab:hover:not(:disabled) {
+  box-shadow: var(--pcz-shadow-xl);
+}
+
+/* ========================================
+ * EXPERT-SPECIFIC BUTTON STYLES
+ * ======================================== */
+
+.pcz-button--expert-budget {
+  background: var(--pcz-expert-budget);
+  border-color: var(--pcz-expert-budget);
+}
+
+.pcz-button--expert-orders {
+  background: var(--pcz-expert-orders);
+  border-color: var(--pcz-expert-orders);
+}
+
+.pcz-button--expert-audit {
+  background: var(--pcz-expert-audit);
+  color: var(--pcz-neutral-900);
+  border-color: var(--pcz-expert-audit);
+}
+
+/* Expert button hover effects */
+.pcz-button--expert-budget:hover:not(:disabled) {
+  background: var(--pcz-success-dark);
+  border-color: var(--pcz-success-dark);
+}
+
+.pcz-button--expert-orders:hover:not(:disabled) {
+  background: var(--pcz-primary-600);
+  border-color: var(--pcz-primary-600);
+}
+
+.pcz-button--expert-audit:hover:not(:disabled) {
+  background: var(--pcz-warning-dark);
+  color: var(--pcz-neutral-0);
+  border-color: var(--pcz-warning-dark);
+}
+
+/* ========================================
+ * RESPONSIVE CONSIDERATIONS
+ * ======================================== */
+
+@media (max-width: 768px) {
+  .pcz-button {
+    min-height: var(--pcz-touch-target-min); /* Ensure 44px touch target on mobile */
+    padding: 0 var(--pcz-space-4); /* Slightly less padding on mobile */
+  }
+  
+  .pcz-button--sm {
+    min-height: 40px; /* Still accessible on mobile */
+  }
+}
+
+/* Tablet and up - allow smaller buttons for secondary actions */
+@media (min-width: 768px) {
+  .pcz-button--sm {
+    min-height: 32px;
+  }
+}
+
+/* ========================================
+ * BUTTON WITH ICONS AND LABELS
+ * ======================================== */
+
+.pcz-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pcz-button__icon--left {
+  margin-right: var(--pcz-space-2);
+}
+
+.pcz-button__icon--right {
+  margin-left: var(--pcz-space-2);
+}
+
+.pcz-button__label {
+  flex: 1;
+  text-align: center;
+}
+
+/* Badge/Counter in Button */
+.pcz-button__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--pcz-space-1);
+  margin-left: var(--pcz-space-2);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--pcz-radius-full);
+  font-size: var(--pcz-text-xs);
+  font-weight: var(--pcz-font-weight-semibold);
+}

@@ -1,0 +1,359 @@
+/* Agent Avatar Styles - Visual Indicators */
+/* Sprint 2B - Visual Indicators Implementation */
+
+.agent-avatar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Avatar Circle */
+.avatar-circle {
+  position: relative;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+/* Size variants */
+.size-small .avatar-circle {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+}
+
+.size-medium .avatar-circle {
+  width: 32px;
+  height: 32px;
+}
+
+.size-large .avatar-circle {
+  width: 48px;
+  height: 48px;
+  border-width: 3px;
+}
+
+/* Avatar Emoji */
+.avatar-emoji {
+  font-size: 1em;
+  transition: transform 0.3s ease;
+}
+
+.size-small .avatar-emoji {
+  font-size: 12px;
+}
+
+.size-medium .avatar-emoji {
+  font-size: 16px;
+}
+
+.size-large .avatar-emoji {
+  font-size: 24px;
+}
+
+/* Status Animations */
+.agent-avatar.status-thinking .avatar-circle {
+  animation: pulse 2s infinite;
+}
+
+.agent-avatar.status-responding .avatar-circle {
+  animation: glow 1.5s ease-in-out infinite alternate;
+}
+
+.agent-avatar.status-complete .avatar-emoji {
+  animation: bounce 0.5s ease-out;
+}
+
+/* Status Dot */
+.status-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  top: -2px;
+  right: -2px;
+  border: 2px solid white;
+}
+
+.status-dot.status-thinking {
+  animation: blink 1s infinite;
+}
+
+.status-dot.status-responding {
+  animation: pulse-dot 1s infinite;
+}
+
+.status-dot.status-complete {
+  background-color: #28a745 !important;
+}
+
+/* Agent Name */
+.agent-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.size-small .agent-name {
+  font-size: 10px;
+}
+
+.size-large .agent-name {
+  font-size: 14px;
+}
+
+/* Status Message */
+.agent-status-message {
+  font-size: 11px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Thinking Animation */
+.thinking-animation {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.thinking-dots span {
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: thinking 1.4s ease-in-out infinite both;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0s; }
+
+/* Typing Indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border-left: 3px solid #007acc;
+}
+
+.typing-text {
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.typing-cursor {
+  display: inline-block;
+  animation: blink 1s infinite;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin: 8px 0;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.progress-status {
+  flex: 1;
+  color: #495057;
+  font-weight: 500;
+}
+
+.progress-percent {
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #e9ecef;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.progress-fill.animated {
+  background: linear-gradient(90deg, 
+    currentColor 0%, 
+    rgba(255,255,255,0.3) 50%, 
+    currentColor 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Category-specific styles */
+.category-financial .avatar-circle {
+  background: linear-gradient(135deg, #e8f5e8, #ffffff);
+}
+
+.category-legal .avatar-circle {
+  background: linear-gradient(135deg, #e8f0ff, #ffffff);
+}
+
+.category-audit .avatar-circle {
+  background: linear-gradient(135deg, #fff3e0, #ffffff);
+}
+
+.category-strategic .avatar-circle {
+  background: linear-gradient(135deg, #f3e5f5, #ffffff);
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px currentColor;
+  }
+  100% {
+    box-shadow: 0 0 15px currentColor, 0 0 20px currentColor;
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  60% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+}
+
+@keyframes thinking {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .agent-avatar .agent-name {
+    display: none;
+  }
+  
+  .typing-indicator {
+    padding: 6px 10px;
+  }
+  
+  .progress-info {
+    font-size: 10px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .avatar-circle {
+    border-width: 3px !important;
+    background: #fff !important;
+  }
+  
+  .status-dot {
+    border-width: 3px !important;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar.animated .avatar-circle,
+  .thinking-dots span,
+  .progress-fill.animated,
+  .typing-cursor {
+    animation: none;
+  }
+  
+  .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Focus styles for accessibility */
+.agent-avatar:focus-within {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Hover effects */
+.agent-avatar:hover .avatar-circle {
+  transform: scale(1.1);
+}
+
+.agent-avatar:hover .agent-name {
+  font-weight: 700;
+}
