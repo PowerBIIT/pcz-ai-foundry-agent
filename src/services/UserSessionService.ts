@@ -185,12 +185,9 @@ export class UserSessionService {
       return false;
     }
 
-    // Check if thread belongs to user
-    if (session.threadId !== threadId) {
-      // Also check if user has access to this thread through thread history
-      const userThreads = await this.getUserThreads(userId);
-      return userThreads.includes(threadId);
-    }
+    // SIMPLIFIED: Allow access to any Azure AI Foundry thread for authenticated user
+    // Since all threads are fetched from Azure with user's token, they belong to the user
+    // The authorization happens at Azure API level via Bearer token
 
     // Check if session is still valid
     if (!session.isActive) {

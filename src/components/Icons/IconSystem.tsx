@@ -7,6 +7,7 @@ interface IconProps {
   size?: number;
   color?: string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // Base Icon Component
@@ -14,7 +15,8 @@ const Icon: React.FC<{ children: React.ReactNode } & IconProps> = ({
   children, 
   size = 16, 
   color = 'currentColor',
-  className = '' 
+  className = '',
+  style = {}
 }) => (
   <svg 
     width={size} 
@@ -26,6 +28,7 @@ const Icon: React.FC<{ children: React.ReactNode } & IconProps> = ({
     strokeLinecap="round" 
     strokeLinejoin="round"
     className={className}
+    style={style}
   >
     {children}
   </svg>
@@ -346,6 +349,76 @@ export const Icons = {
       <circle cx="8.5" cy="7.5" r=".5" />
       <circle cx="6.5" cy="12.5" r=".5" />
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+    </Icon>
+  ),
+
+  // Additional icons needed for Agent Response components
+  Check: (props: IconProps) => (
+    <Icon {...props}>
+      <polyline points="20,6 9,17 4,12" />
+    </Icon>
+  ),
+
+  Copy: (props: IconProps) => (
+    <Icon {...props}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </Icon>
+  ),
+
+  ChevronDown: (props: IconProps) => (
+    <Icon {...props}>
+      <polyline points="6,9 12,15 18,9" />
+    </Icon>
+  ),
+
+  TrendingUp: (props: IconProps) => (
+    <Icon {...props}>
+      <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" />
+      <polyline points="16,7 22,7 22,13" />
+    </Icon>
+  ),
+
+  ArrowRight: (props: IconProps) => (
+    <Icon {...props}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12,5 19,12 12,19" />
+    </Icon>
+  ),
+
+  Shield: (props: IconProps) => (
+    <Icon {...props}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </Icon>
+  ),
+
+  CheckSquare: (props: IconProps) => (
+    <Icon {...props}>
+      <polyline points="9,11 12,14 22,4" />
+      <path d="m21,3h0a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2H3a2,2 0 0,1 -2,-2V5A2,2 0 0,1 3,3H21z" />
+    </Icon>
+  ),
+
+  Calendar: (props: IconProps) => (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </Icon>
+  ),
+
+  AlertTriangle: (props: IconProps) => (
+    <Icon {...props}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </Icon>
+  ),
+
+  Play: (props: IconProps) => (
+    <Icon {...props}>
+      <polygon points="5,3 19,12 5,21 5,3" />
     </Icon>
   )
 };

@@ -63,16 +63,21 @@ const ChatInterface: React.FC = () => {
   }, [isAuthenticated, accounts, instance]);
   
   // Chat History Hook
-  const { conversations, loadConversationMessages } = useChatHistory(currentUserId, {
+  const { conversations, loadConversationMessages, selectConversation } = useChatHistory(currentUserId, {
     autoRefresh: true,
     token: accessToken,
     onConversationSelect: async (threadId) => {
       console.info(`Selected conversation: ${threadId}`);
       toast.info(`Ładowanie rozmowy: ${threadId.substring(0, 12)}...`);
       
-      // Load messages from selected conversation
+      // Get fresh token for loading messages
       try {
-        const conversationMessages = await loadConversationMessages(threadId);
+        const tokenResponse = await instance.acquireTokenSilent({
+          scopes: ["https://ai.azure.com/.default"],
+          account: accounts[0]
+        });
+        
+        const conversationMessages = await chatHistoryService.loadConversationMessages(threadId, currentUserId!, tokenResponse.accessToken);
         setMessages(conversationMessages);
         console.info(`Loaded ${conversationMessages.length} messages from conversation ${threadId}`);
         toast.success('Rozmowa została załadowana');
@@ -513,20 +518,10 @@ const ChatInterface: React.FC = () => {
                       key={conv.threadId}
                       className={`history-item ${conv.isActive ? 'active' : ''}`}
                       style={{position: 'relative'}}
-                      onClick={async () => {
+                      onClick={() => {
                         console.info(`Clicking conversation: ${conv.threadId}`);
-                        toast.info(`Ładowanie rozmowy: ${conv.title}`);
-                        
-                        // Load messages from selected conversation
-                        try {
-                          const conversationMessages = await loadConversationMessages(conv.threadId);
-                          setMessages(conversationMessages);
-                          console.info(`Loaded ${conversationMessages.length} messages from conversation ${conv.threadId}`);
-                          toast.success('Rozmowa została załadowana');
-                        } catch (error) {
-                          console.error('Failed to load conversation messages:', error);
-                          toast.error('Błąd ładowania rozmowy');
-                        }
+                        // Use selectConversation from hook to properly update active state
+                        selectConversation(conv.threadId);
                       }}
                       title={`${conv.title} - ${conv.messageCount} wiadomości`}
                     >

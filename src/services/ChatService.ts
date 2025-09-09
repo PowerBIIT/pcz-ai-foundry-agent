@@ -148,6 +148,18 @@ export class ChatService {
           const statusData = await statusResponse.json();
           runStatus = statusData.status;
           
+          // Log detailed status for debugging
+          if (runStatus === 'failed') {
+            console.error(`Azure AI run failed:`, statusData);
+            console.error(`Failed run details:`, {
+              threadId,
+              runId,
+              status: runStatus,
+              lastError: statusData.last_error,
+              failedAt: statusData.failed_at
+            });
+          }
+          
           // Provide progress updates
           if (attempts % 5 === 0) { // Every 5 seconds
             options?.onProgress?.(`Przetwarzanie... (${attempts}s)`);
