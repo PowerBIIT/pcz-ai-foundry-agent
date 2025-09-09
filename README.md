@@ -21,12 +21,14 @@ PCZ Agent to aplikacja Single-Page Application (SPA) zbudowana w React + TypeScr
 
 ### Główne funkcjonalności:
 - ✅ **Multi-user support** - Izolacja sesji między użytkownikami
+- ✅ **Chat history management** - Pełna historia rozmów z Azure AI Foundry
+- ✅ **Delete conversations** - Usuwanie pojedynczych i wszystkich rozmów
 - ✅ **File attachments** - Upload i analiza dokumentów (PDF, DOCX, XLSX, TXT, MD)
 - ✅ **Document analysis** - Connected Agents analizują przesłane pliki
 - ✅ **Expert routing** - 10 wyspecjalizowanych ekspertów finansowych
 - ✅ **Fraud detection** - Automatyczne wykrywanie dzielenia zamówień (próg 1000 PLN)
 - ✅ **Citations display** - Professional wyświetlanie źródeł i referencji
-- ✅ **Compact UI** - Modern chat interface z attachment icon
+- ✅ **Compact UI** - Modern chat interface z attachment icon i history sidebar
 - ✅ **Session management** - Persistent sessions z localStorage
 - ✅ **Real-time progress** - Multi-step progress tracking
 - ✅ **Error handling** - Graceful degradation i user feedback
@@ -380,9 +382,20 @@ Authorization: Bearer {token}
 
 Projekt wewnętrzny Politechniki Częstochowskiej.
 
-**Ostatnia aktualizacja**: 2025-09-07  
-**Wersja**: 2.0.0 ENTERPRISE  
-**Status**: 🏆 ALL SPRINTS COMPLETE - Enterprise-grade multi-user CFO tool
+**Ostatnia aktualizacja**: 2025-09-09  
+**Wersja**: 2.1.0 ENTERPRISE ENHANCED  
+**Status**: 🏆 PRODUCTION-READY - Enterprise-grade multi-user CFO tool z pełną historią rozmów
+
+### 🏆 Changelog v2.1.0 ENTERPRISE ENHANCED (2025-09-09):
+
+**🔥 NOWE FUNKCJONALNOŚCI HISTORII ROZMÓW:**
+- ✅ **Chat History z Azure AI Foundry** - Pełna integracja z rzeczywistymi threads
+- ✅ **Delete pojedynczych rozmów** - Przyciski 🗑️ przy każdej konwersacji
+- ✅ **Delete wszystkich rozmów** - Przycisk "🗑️ Wszystkie" w nagłówku
+- ✅ **Rzeczywiste Azure API** - DELETE /threads/{id} z Azure AI Foundry
+- ✅ **Auto-refresh** - Historia odświeża się automatycznie po zmianach
+- ✅ **Security metadata** - Nowe threads mają userId dla izolacji per user
+- ✅ **Professional UI** - Subtelne przyciski zintegrowane z motywem
 
 ### 🏆 Changelog v2.0.0 ENTERPRISE COMPLETE (2025-09-07):
 
@@ -401,7 +414,8 @@ Projekt wewnętrzny Politechniki Częstochowskiej.
 **SPRINT 2B - Visual Experience:**
 - ✅ **Agent avatars** - Visual identification (💰 📋 🔍) z animations
 - ✅ **Enhanced loading** - Multi-step progress visualization  
-- ✅ **Chat history** - Complete service layer implemented
+- ✅ **Chat history** - Complete service layer z Azure AI Foundry integration
+- ✅ **Delete functionality** - Przyciski usuwania rozmów z rzeczywistym Azure API
 
 **SPRINT 3 - Professional Tools:**
 - ✅ **PDF Export** - Working report generation z PCz branding
