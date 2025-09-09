@@ -267,14 +267,20 @@ export class ChatService {
    */
   async createNewConversation(userId: string, token: string): Promise<string> {
     try {
-      // Create new Azure AI Foundry thread
+      // Create new Azure AI Foundry thread with user metadata
       const threadResponse = await fetch(`${this.endpoint}/threads?api-version=2025-05-01`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          metadata: {
+            userId: userId,
+            createdAt: new Date().toISOString(),
+            application: 'pcz-agent'
+          }
+        })
       });
 
       if (!threadResponse.ok) {

@@ -174,7 +174,7 @@ export const useChatHistory = (userId: string | null, options?: UseChatHistoryOp
     if (!userId) return;
 
     try {
-      await chatHistoryService.deleteConversation(threadId, userId);
+      await chatHistoryService.deleteConversation(threadId, userId, options?.token || '');
       
       // Remove from state
       setState(prev => ({

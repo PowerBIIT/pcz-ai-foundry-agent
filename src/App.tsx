@@ -17,6 +17,7 @@ import { savedResponsesService } from './services/SavedResponsesService';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useSlashCommands } from './hooks/useSlashCommands';
 import { triggerHistoryRefresh, triggerMessageReceived, useChatHistory } from './hooks/useChatHistory';
+import { chatHistoryService } from './services/ChatHistoryService';
 import Icons from './components/Icons/IconSystem';
 import { IconButton } from './components/Icons/IconContainer';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
@@ -470,7 +471,35 @@ const ChatInterface: React.FC = () => {
           
           <div className="chat-history">
             <div className="history-section">
-              <h3>Historia rozmów</h3>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <h3>Historia rozmów</h3>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('Czy na pewno chcesz usunąć WSZYSTKIE rozmowy?')) {
+                      try {
+                        await chatHistoryService.deleteAllConversations(currentUserId!, accessToken);
+                        toast.success('Wszystkie rozmowy zostały usunięte');
+                        triggerHistoryRefresh();
+                      } catch (error) {
+                        console.error('Delete all error:', error);
+                        toast.error('Błąd usuwania wszystkich rozmów');
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(124, 58, 237, 0.1)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                  title="Usuń wszystkie rozmowy"
+                >
+                  🗑️ Wszystkie
+                </button>
+              </div>
               
               {/* Current session info */}
               <div style={{fontSize: '11px', color: '#666', marginBottom: '12px', padding: '6px 8px', background: 'rgba(124, 58, 237, 0.1)', borderRadius: '4px'}}>
@@ -483,6 +512,7 @@ const ChatInterface: React.FC = () => {
                     <div 
                       key={conv.threadId}
                       className={`history-item ${conv.isActive ? 'active' : ''}`}
+                      style={{position: 'relative'}}
                       onClick={async () => {
                         console.info(`Clicking conversation: ${conv.threadId}`);
                         toast.info(`Ładowanie rozmowy: ${conv.title}`);
@@ -506,6 +536,36 @@ const ChatInterface: React.FC = () => {
                       <small style={{display: 'block', marginTop: '2px', opacity: '0.6', fontSize: '10px'}}>
                         {conv.messageCount} msg • {conv.threadId.substring(0, 8)}...
                       </small>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (window.confirm('Czy na pewno chcesz usunąć tę rozmowę?')) {
+                            try {
+                              await chatHistoryService.deleteConversation(conv.threadId, currentUserId, accessToken);
+                              toast.success('Rozmowa została usunięta');
+                              triggerHistoryRefresh();
+                            } catch (error) {
+                              console.error('Delete error:', error);
+                              toast.error('Błąd usuwania rozmowy');
+                            }
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '4px',
+                          right: '4px',
+                          background: 'rgba(124, 58, 237, 0.1)',
+                          border: '1px solid rgba(124, 58, 237, 0.2)',
+                          cursor: 'pointer',
+                          opacity: '1',
+                          borderRadius: '4px',
+                          padding: '2px 4px',
+                          fontSize: '12px'
+                        }}
+                        title="Usuń rozmowę"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   ))}
                 </div>
